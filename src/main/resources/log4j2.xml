@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Configuration后面的status，这个用于设置log4j2自身内部的信息输出，可以不设置，当设置成trace时， 你会看到log4j2内部各种详细输出。可以设置成OFF(关闭)或Error(只输出错误信息) -->
+<Configuration status="WARN" monitorInterval="30">
+	<Properties>
+		<Property name="App">spark-demo</Property>
+		<Property name="logDir">/tmp/logs</Property>
+		<Property name="splitSize">128 MB</Property>
+	</Properties>
+
+	<Appenders>
+		<!-- 输出控制台日志的配置 -->
+		<Console name="console" target="SYSTEM_OUT">
+			<!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch） -->
+			<ThresholdFilter level="info" onMatch="ACCEPT"
+				onMismatch="DENY" />
+			<!-- 输出日志的格式 -->
+			<PatternLayout
+				pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n" />
+		</Console>
+
+		<!-- 打印出所有的信息，每次大小超过size，则这size大小的日志会自动存入按年份-月份建立的文件夹下面并进行压缩，作为存档 -->
+		<RollingRandomAccessFile name="infoLog"
+			fileName="${logDir}/${App}-info.log" immediateFlush="false"
+			filePattern="${logDir}/$${date:yyyy-MM}/${App}-info-%d{MM-dd-yyyy}-%i.log.gz"
+			append="true">
+			<PatternLayout
+				pattern="%d{yyyy-MM-dd 'at' HH:mm:ss z} [%t] %-5level %logger{36} %L %M - %msg%xEx%n" />
+			<Policies>
+				<TimeBasedTriggeringPolicy interval="6"
+					modulate="true" />
+				<SizeBasedTriggeringPolicy
+					size="${splitSize}" />
+			</Policies>
+			<Filters>
+				<!-- 只记录info和warn级别信息 -->
+				<ThresholdFilter level="error" onMatch="DENY"
+					onMismatch="NEUTRAL" />
+				<ThresholdFilter level="info" onMatch="ACCEPT"
+					onMismatch="DENY" />
+			</Filters>
+			<!-- 指定每天的最大压缩包个数，默认7个，超过了会覆盖之前的 -->
+			<DefaultRolloverStrategy max="50" />
+		</RollingRandomAccessFile>
+
+		<!-- 存储所有error信息 -->
+		<RollingRandomAccessFile name="errorLog"
+			fileName="${logDir}/${App}-error.log" immediateFlush="false"
+			filePattern="${logDir}/$${date:yyyy-MM}/${App}-error-%d{MM-dd-yyyy}-%i.log.gz"
+			append="false">
+			<PatternLayout
+				pattern="%d{yyyy-MM-dd 'at' HH:mm:ss z} [%t] %-5level %logger{36} %L %M - %msg%xEx%n" />
+			<Policies>
+				<TimeBasedTriggeringPolicy interval="6"
+					modulate="true" />
+				<SizeBasedTriggeringPolicy
+					size="${splitSize}" />
+			</Policies>
+			<Filters>
+				<!-- 只记录error级别信息 -->
+				<ThresholdFilter level="error" onMatch="ACCEPT"
+					onMismatch="DENY" />
+			</Filters>
+			<!-- 指定每天的最大压缩包个数，默认7个，超过了会覆盖之前的 -->
+			<DefaultRolloverStrategy max="50" />
+		</RollingRandomAccessFile>
+
+		<Async name="ASYNC">
+			<AppenderRef ref="infoLog" />
+			<AppenderRef ref="errorLog" />
+			<AppenderRef ref="console" />
+		</Async>
+	</Appenders>
+
+	<Loggers>
+		<!-- root logger 配置,全局配置，默认所有的Logger都继承此配置 -->
+		<!-- AsyncRoot - 异步记录日志 - 需要LMAX Disruptor的支持 -->
+		<Root includeLocation="true" level="all">
+			<AppenderRef ref="ASYNC" />
+		</Root>
+	</Loggers>
+</Configuration>
